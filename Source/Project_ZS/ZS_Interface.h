@@ -37,7 +37,7 @@ public:
 
 	//void GetCurrentStates(EMovementMode& PawnMovementMode, EMovementState& MovementStates, EMovementState& PrevMovementState, EMovementAction& MovemeentAction, ERotationMode& RotationModes, EGait& ActualGaits, EStance& ActualStance, EViewMode& ViewModes);
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Essential Values")
-	void GetCurrentStates(TEnumAsByte<EMovementMode>& PawnMovementMode, EMovementState& MovementStates, EMovementState& PrevMovementState, EMovementAction& MovemeentAction, ERotationMode& RotationModes, EGait& ActualGaits, EStance& ActualStance, EViewMode& ViewModes, EOverlayState& Overlays);
+	void GetCurrentStates(TEnumAsByte<EMovementMode>& PawnMovementMode, EMovementState& MovementStates, EMovementState& PrevMovementStates, EMovementAction& MovemeentAction, ERotationMode& RotationModes, EGait& ActualGaits, EStance& ActualStance, EViewMode& ViewModes, EOverlayState& Overlays);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Essential Values")
 	void SetOverlayState(EOverlayState Overlays);

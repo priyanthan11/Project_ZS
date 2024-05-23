@@ -42,14 +42,14 @@ AProject_ZSCharacter::AProject_ZSCharacter():
 	Acceleration(0.f),
 	bIsMoving(false),
 	bHasMovementInput(false),
-	LastVelocityRotation(0.f),
-	LastMovementInputRotation(0.f),
 	Speed(0.f),
 	MovementInputAmount(0.f),
 	AimYawRate(0.f),
 #pragma endregion
 #pragma region Rotation Systems
-	TargetRotation(0.f)
+	TargetRotation(GetActorRotation()),
+	LastVelocityRotation(GetActorRotation()),
+	LastMovementInputRotation(GetActorRotation())
 
 #pragma endregion
 
@@ -110,6 +110,9 @@ void AProject_ZSCharacter::BeginPlay()
 
 void AProject_ZSCharacter::Initialize_ZSValues()
 {
+	GetMesh()->AddTickPrerequisiteActor(this);
+	
+
 	/*Get movement data from the Movement Model Data table and set the Movement Data Struct.
 	This allows you to easily switch out movement behaviors.*/
 
@@ -140,6 +143,19 @@ void AProject_ZSCharacter::Initialize_ZSValues()
 
 	OnGaitChanged(DesiredGait);
 	OnRotationModeChanged(DesiredRotationMode);
+
+	switch (DesiredStance)
+	{
+	case EStance::EMA_Standing:
+		UnCrouch();
+		break;
+	case EStance::EMA_Crouching:
+		Crouch();
+		break;
+	default:
+		break;
+
+	}
 
 }
 
@@ -229,6 +245,35 @@ void AProject_ZSCharacter::SetMovementState_Implementation(EMovementState NewMov
 	}
 }
 
+void AProject_ZSCharacter::GetCurrentStates_Implementation(TEnumAsByte<EMovementMode>& PawnMovementMode, 
+	EMovementState& MovementStates, EMovementState& PrevMovementStates, EMovementAction& MovemeentAction, 
+	ERotationMode& RotationModes, EGait& ActualGaits, EStance& ActualStance, EViewMode& ViewModes, EOverlayState& Overlays)
+{
+	MovementStates = MovementState;
+	MovemeentAction = MovementAction;
+	RotationModes = RotationMode;
+	ActualGaits = Gait;
+	ActualStance = Stance;
+	ViewModes = ViewMode;
+	Overlays = OverlayState;
+
+}
+
+void AProject_ZSCharacter::GetEssentialValues_Implementation(FVector& IVelocity, 
+	FVector& IAcceleration, FVector& IMovementInput, bool& IIsMoving, bool& IHasMovementInput, 
+	float& ISpeed, float& IMovementInputAmount, float& IAimYawRate, FRotator& IAimingRotation)
+{
+	IVelocity = GetVelocity();
+	IAcceleration = Acceleration;
+	IMovementInput = GetCharacterMovement()->GetCurrentAcceleration();
+	IIsMoving = bIsMoving;
+	IHasMovementInput = bHasMovementInput;
+	ISpeed = Speed;
+	IMovementInputAmount = MovementInputAmount;
+	IAimYawRate = AimYawRate;
+	IAimingRotation = GetControlRotation();
+}
+
 void AProject_ZSCharacter::OnMovementStateChanged(EMovementState NewMovementState)
 {
 	EMovementState PreviousMovementState;
@@ -237,8 +282,6 @@ void AProject_ZSCharacter::OnMovementStateChanged(EMovementState NewMovementStat
 
 void AProject_ZSCharacter::OnGaitChanged(EGait NewActualGait)
 {
-	if (NewActualGait == Gait) return;
-	
 	EGait PreiviousGait;
 	SetPreviousAndNewValue(NewActualGait, Gait, PreiviousGait);
 }
@@ -248,7 +291,73 @@ void AProject_ZSCharacter::OnRotationModeChanged(ERotationMode NewRotationMode)
 	ERotationMode PreviousRotation;
 	SetPreviousAndNewValue(NewRotationMode, RotationMode, PreviousRotation);
 }
+void AProject_ZSCharacter::OnStanceChanged(EStance NewStance)
+{
+	EStance PreviousStance;
+	SetPreviousAndNewValue(NewStance, Stance, PreviousStance);
+}
+void AProject_ZSCharacter::WalkAction()
+{
+	switch (DesiredGait)
+	{
+	case EGait::EGT_Walking:
+		DesiredGait = EGait::EGT_Running;
+		break;
+	case EGait::EGT_Running:
+		DesiredGait = EGait::EGT_Walking;
+		break;
+	case EGait::EGT_Sprinting:
+		DesiredGait = EGait::EGT_Walking;
+		break;
+	default:
+		break;
+	}
+}
 
+#pragma region Input Functions
+void AProject_ZSCharacter::SprintAction(TEnumAsByte<EGait> t_DesirdGait)
+{
+	DesiredGait = t_DesirdGait;
+}
+
+void AProject_ZSCharacter::SprintPressed()
+{
+	DesiredGait = EGait::EGT_Sprinting;
+}
+
+void AProject_ZSCharacter::SprintReleased()
+{
+	DesiredGait = EGait::EGT_Running;
+}
+
+void AProject_ZSCharacter::StanceAction()
+{
+	if (MovementAction != EMovementAction::EMA_NONE) return;
+	switch (MovementState)
+	{
+	case EMovementState::EMS_Grounded:
+		switch (Stance)
+		{
+		case EStance::EMA_Standing:
+			DesiredStance = EStance::EMA_Crouching;
+			Crouch();
+			UE_LOG(LogTemp,Warning,TEXT("Crouch: Crouching"));
+			break;
+		case EStance::EMA_Crouching:
+			DesiredStance = EStance::EMA_Standing;
+			UnCrouch();
+			UE_LOG(LogTemp, Warning, TEXT("Crouch: UnCrouch"));
+			break;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+#pragma endregion
 void AProject_ZSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
@@ -263,6 +372,18 @@ void AProject_ZSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AProject_ZSCharacter::Look);
+		
+		// Sprinting
+		EnhancedInputComponent->BindAction(ISprintAction, ETriggerEvent::Started, this, &AProject_ZSCharacter::SprintPressed);
+		EnhancedInputComponent->BindAction(ISprintAction, ETriggerEvent::Completed, this, &AProject_ZSCharacter::SprintReleased);
+
+		// Walking
+		EnhancedInputComponent->BindAction(IWalkAction, ETriggerEvent::Started, this, &AProject_ZSCharacter::WalkAction);
+		
+		// Crouching
+		EnhancedInputComponent->BindAction(ICrouchAction, ETriggerEvent::Started, this, &AProject_ZSCharacter::StanceAction);
+
+
 	}
 	else
 	{
@@ -494,6 +615,16 @@ void AProject_ZSCharacter::UpdateGroundedRotation()
 	}
 
 }
+void AProject_ZSCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	OnStanceChanged(EStance::EMA_Crouching);
+}
+void AProject_ZSCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+	OnStanceChanged(EStance::EMA_Standing);
+}
 EGait AProject_ZSCharacter::GetAllowedGait()
 {
 	switch (Stance)
@@ -583,7 +714,7 @@ EGait AProject_ZSCharacter::GetActualGait(EGait m_AllowedGait)
 	else if (Speed >= LocalWalkSpeed + 10.f)
 		return EGait::EGT_Running;
 	else
-		return EGait::EGT_Running;
+		return EGait::EGT_Walking;
 
 
 	return EGait();

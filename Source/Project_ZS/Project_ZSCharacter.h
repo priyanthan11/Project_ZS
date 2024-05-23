@@ -58,6 +58,16 @@ class AProject_ZSCharacter : public ACharacter, public IZS_Interface
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
 
+	/** Sprint Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ISprintAction;
+	/** Walk Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* IWalkAction;
+	/** Crouch Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ICrouchAction;
+
 	// Interface
 	IZS_Interface* ZS_Interface;
 
@@ -81,6 +91,7 @@ class AProject_ZSCharacter : public ACharacter, public IZS_Interface
 	bool bIsMoving;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Essential Variables", meta = (AllowPrivateAccess = "true"))
 	bool bHasMovementInput;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Essential Variables", meta = (AllowPrivateAccess = "true"))
 	FRotator LastVelocityRotation;
@@ -159,6 +170,8 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "While On Ground - Movement")
 	void UpdateGroundedRotation();
 
+	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
 #pragma region Helper Functions
 	// Update Character Movement related Fucntions
 	UFUNCTION(BlueprintPure,BlueprintCallable, Category = "While On Ground - Movement")
@@ -191,14 +204,37 @@ protected:
 #pragma endregion
 #pragma region Interface Fucntions
 	virtual void SetGait_Implementation(EGait NewGait) override;
-	virtual void SetMovementState_Implementation(EMovementState NewMovementState);
+	virtual void SetMovementState_Implementation(EMovementState NewMovementState)override;
+	virtual void GetCurrentStates_Implementation(TEnumAsByte<EMovementMode>&PawnMovementMode,
+		EMovementState & MovementStates, 
+		EMovementState & PrevMovementState, 
+		EMovementAction & MovemeentAction, 
+		ERotationMode & RotationModes, 
+		EGait & ActualGaits, 
+		EStance & ActualStance, 
+		EViewMode & ViewModes, 
+		EOverlayState & Overlays)override;
+	virtual void GetEssentialValues_Implementation(FVector & IVelocity, 
+		FVector & IAcceleration, FVector & IMovementInput, bool& IIsMoving, 
+		bool& IHasMovementInput, float& ISpeed, float& IMovementInputAmount, float& IAimYawRate, FRotator & IAimingRotation) override;
+
 #pragma endregion
 #pragma region Value Change
 	void OnMovementStateChanged(EMovementState NewMovementState);
 	void OnGaitChanged(EGait NewActualGait);
 	void OnRotationModeChanged(ERotationMode NewRotationMode);
+	void OnStanceChanged(EStance NewStance);
 #pragma endregion
-
+#pragma region Input
+	UFUNCTION(BlueprintCallable)
+	void SprintAction(TEnumAsByte<EGait> t_DesirdGait);
+	void SprintPressed();
+	void SprintReleased();
+	void StanceAction();
+	UFUNCTION(BlueprintCallable)
+	void WalkAction();
+	
+#pragma endregion
 
 protected:
 	// APawn interface
