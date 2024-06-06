@@ -141,8 +141,8 @@ void UZS_AnimInstance::UpdateAimingValues()
 	/*Separate the Aiming Yaw Angle into 3 separate Yaw Times. These 3 values are used in the Aim Offset behavior
 	to improve the blending of the aim offset when rotating completely around the character. This allows you to keep
 	the aiming responsive but still smoothly blend from left to right or right to left.*/
-	LeftYawTime = UKismetMathLibrary::MapRangeClamped(abs(AimingAngle.X), 0.0f, 180.f, 0.5f, 0.0f);
-	RightYawTime = UKismetMathLibrary::MapRangeClamped(abs(AimingAngle.X), 0.0f, 180.f, 0.5f, 1.0f);
+	LeftYawTime = UKismetMathLibrary::MapRangeClamped(abs(SmoothedAimingAngle.X), 0.0f, 180.f, 0.5f, 0.0f);
+	RightYawTime = UKismetMathLibrary::MapRangeClamped(abs(SmoothedAimingAngle.X), 0.0f, 180.f, 0.5f, 1.0f);
 	ForwardYawTime = UKismetMathLibrary::MapRangeClamped(SmoothedAimingAngle.X, -180.f, 180.f, 0.0f, 1.0f);
 
 }
@@ -501,6 +501,7 @@ void UZS_AnimInstance::RotateInPlaceCheck()
 {
 	if (CanRotateInPlace())
 	{
+		
 		/*Step 1: Check if the character should rotate left or right by checking if 
 		the Aiming Angle exceeds the threshold.*/
 		RotateL = AimingAngle.X < -50.f /*Rotate Min Threshold*/;
@@ -574,40 +575,23 @@ void UZS_AnimInstance::TurnInPlaceCheck()
 
 void UZS_AnimInstance::TurnInPlace(FRotator TargetRotation, float PlayRateScale, float StartTime, bool OverrideCurent)
 {
-	//UE_LOG(LogTemp, Warning, TEXT("TurnInPlace: In TurnInPlace"));
 	//Step 1: Set Turn Angle
 	float TurnAngle = UKismetMathLibrary::NormalizedDeltaRotator(TargetRotation, PlayerCharacter->GetActorRotation()).Yaw;
 
 	//Step 2: Choose Turn Asset based on the Turn Angle and Stance
 	FTurnInPlace_Asset TargetTurnAsset;
+
 	if (abs(TurnAngle) < 130.f/*Turn 180Threshold*/)
 	{
-		//UE_LOG(LogTemp, Warning, TEXT("TurnInPlace: 1st Check"));
-
 		if (TurnAngle < 0.0f)
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("TurnInPlace: 2nd Check"));
 			switch (AI_Stance)
 			{
 			case EStance::EMA_Standing:
-				/*NTurnIPL90.Animation = NTurnIPL90Seq;
-				NTurnIPL90.AnimatedAngle = -90.f;
-				NTurnIPL90.SlotName = "(N)Turn/Rotate";
-				NTurnIPL90.PlayRate = 1.2f;
-				NTurnIPL90.ScaleTurnAngle = true;*/
-
 				TargetTurnAsset = NTurnIPL90;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch: TP 90"));
 				break;
 			case EStance::EMA_Crouching:
-				/*CLFTurnIPL90.Animation = CLFTurnIPL90Seq;
-				CLFTurnIPL90.AnimatedAngle = -90.f;
-				CLFTurnIPL90.SlotName = "(CLF)Turn/Rotate";
-				CLFTurnIPL90.PlayRate = 1.2f;
-				CLFTurnIPL90.ScaleTurnAngle = false;*/
-
 				TargetTurnAsset = CLFTurnIPL90;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch:TPC 90"));
 				break;
 			default:
 				break;
@@ -615,29 +599,13 @@ void UZS_AnimInstance::TurnInPlace(FRotator TargetRotation, float PlayRateScale,
 		}
 		else
 		{
-			//UE_LOG(LogTemp, Warning, TEXT("TurnInPlace: 2nd Check else"));
 			switch (AI_Stance)
 			{
 			case EStance::EMA_Standing:
-				/*NTurnIPR90.Animation = NTurnIPR90Seq;
-				NTurnIPR90.AnimatedAngle = 90.f;
-				NTurnIPR90.SlotName = "(N)Turn/Rotate";
-				NTurnIPR90.PlayRate = 1.2f;
-				NTurnIPR90.ScaleTurnAngle = true;*/
-
 				TargetTurnAsset = NTurnIPR90;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch:TP 90F"));
-
 				break;
 			case EStance::EMA_Crouching:
-				/*CLFTurnIPR90.Animation = CLFTurnIPR90Seq;
-				CLFTurnIPR90.AnimatedAngle = 90.f;
-				CLFTurnIPR90.SlotName = "(CLF)Turn/Rotate";
-				CLFTurnIPR90.PlayRate = 1.2f;
-				CLFTurnIPR90.ScaleTurnAngle = false;*/
-
 				TargetTurnAsset = CLFTurnIPR90;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch:TPC 90F"));
 				break;
 			default:
 				break;
@@ -646,30 +614,16 @@ void UZS_AnimInstance::TurnInPlace(FRotator TargetRotation, float PlayRateScale,
 	}
 	else
 	{
-		//UE_LOG(LogTemp, Warning, TEXT("TurnInPlace: 1st Check else"));
+		UE_LOG(LogTemp, Warning, TEXT("TurnInPlace: 1st Check else"));
 		if (TurnAngle < 0.0f)
 		{
 			switch (AI_Stance)
 			{
 			case EStance::EMA_Standing:
-				/*NTurnIPL180.Animation = NTurnIPL180Seq;
-				NTurnIPL180.AnimatedAngle = -180.f;
-				NTurnIPL180.SlotName = "(N)Turn/Rotate";
-				NTurnIPL180.PlayRate = 1.2f;
-				NTurnIPL180.ScaleTurnAngle = true;*/
-
 				TargetTurnAsset = NTurnIPL180;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch:TP 180"));
 				break;
 			case EStance::EMA_Crouching:
-				/*CLFTurnIPL180.Animation = CLFTurnIPL180Seq;
-				CLFTurnIPL180.AnimatedAngle = -180.f;
-				CLFTurnIPL180.SlotName = "(CLF)Turn/Rotate";
-				CLFTurnIPL180.PlayRate = 1.2f;
-				CLFTurnIPL180.ScaleTurnAngle = false;*/
-
 				TargetTurnAsset = CLFTurnIPL180;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch:TPC 180"));
 				break;
 			default:
 				break;
@@ -680,24 +634,10 @@ void UZS_AnimInstance::TurnInPlace(FRotator TargetRotation, float PlayRateScale,
 			switch (AI_Stance)
 			{
 			case EStance::EMA_Standing:
-				/*NTurnIPR180.Animation = NTurnIPR180Seq;
-				NTurnIPR180.AnimatedAngle = 180.f;
-				NTurnIPR180.SlotName = "(N)Turn/Rotate";
-				NTurnIPR180.PlayRate = 1.2f;
-				NTurnIPR180.ScaleTurnAngle = true;*/
-
 				TargetTurnAsset = NTurnIPR180;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch:TP 180F"));
 				break;
 			case EStance::EMA_Crouching:
-				/*CLFTurnIPR180.Animation = CLFTurnIPR180Seq;
-				CLFTurnIPR180.AnimatedAngle = 180.f;
-				CLFTurnIPR180.SlotName = "(CLF)Turn/Rotate";
-				CLFTurnIPR180.PlayRate = 1.2f;
-				CLFTurnIPR180.ScaleTurnAngle = false;*/
-
-				TargetTurnAsset = CLFTurnIPR180;
-				//UE_LOG(LogTemp, Warning, TEXT("Switch:TPC 180F"));
+			TargetTurnAsset = CLFTurnIPR180;
 				break;
 			default:
 				break;
@@ -707,7 +647,6 @@ void UZS_AnimInstance::TurnInPlace(FRotator TargetRotation, float PlayRateScale,
 
 	/*Step 3: If the Target Turn Animation is not playing or set to be overriden, 
 	play the turn animation as a dynamic montage.*/
-
 	if (OverrideCurent || !IsPlayingSlotAnimation(TargetTurnAsset.Animation, TargetTurnAsset.SlotName))
 	{
 		PlaySlotAnimationAsDynamicMontage(TargetTurnAsset.Animation, TargetTurnAsset.SlotName, 0.2f, 0.2f, TargetTurnAsset.PlayRate * PlayRateScale, 1, 0.0f, StartTime);
@@ -715,13 +654,9 @@ void UZS_AnimInstance::TurnInPlace(FRotator TargetRotation, float PlayRateScale,
 		/*Step 4: Scale the rotation amount (gets scaled in animgraph) to compensate for turn angle (If Allowed) and play rate.*/
 
 		if (TargetTurnAsset.ScaleTurnAngle)
-		{
 			RotationScale = (TurnAngle / TargetTurnAsset.AnimatedAngle) * TargetTurnAsset.PlayRate * PlayRateScale;
-		}
 		else
-		{
 			RotationScale = TargetTurnAsset.PlayRate * PlayRateScale;
-		}
 	}
 
 }

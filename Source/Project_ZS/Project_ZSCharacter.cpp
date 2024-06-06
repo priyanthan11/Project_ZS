@@ -1,5 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 #pragma region Include
+
+#include "Project_ZSCharacter.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/LocalPlayer.h"
@@ -9,7 +11,7 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
-#include "Project_ZSCharacter.h"
+
 
 #include "Curves/CurveVector.h"
 #include "DrawDebugHelpers.h"
@@ -49,10 +51,14 @@ AProject_ZSCharacter::AProject_ZSCharacter():
 #pragma region Rotation Systems
 	TargetRotation(GetActorRotation()),
 	LastVelocityRotation(GetActorRotation()),
-	LastMovementInputRotation(GetActorRotation())
+	LastMovementInputRotation(GetActorRotation()),
 
 #pragma endregion
-
+#pragma region Camera
+	ThridPersionFOV(90.f),
+	FirstPersionFOV(90.f),
+	bRightShoulder(true)
+#pragma endregion
 #pragma endregion
 
 {
@@ -77,16 +83,16 @@ AProject_ZSCharacter::AProject_ZSCharacter():
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
-	// Create a camera boom (pulls in towards the player if there is a collision)
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f; // The camera follows at this distance behind the character	
-	CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
+	//// Create a camera boom (pulls in towards the player if there is a collision)
+	//CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	//CameraBoom->SetupAttachment(RootComponent);
+	//CameraBoom->TargetArmLength = 400.0f; // The camera follows at this distance behind the character	
+	//CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
 
-	// Create a follow camera
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
-	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
+	//// Create a follow camera
+	//FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	//FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
+	//FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
@@ -166,7 +172,7 @@ void AProject_ZSCharacter::Tick(float DeltaSeconds)
 	SetEssentialValues();
 	CacheValues();
 	DrawDebugShapes();
-
+	CalculateCrosshairSpread(DeltaSeconds);
 	switch (MovementState)
 	{
 	case EMovementState::EMS_NONE:
@@ -274,6 +280,53 @@ void AProject_ZSCharacter::GetEssentialValues_Implementation(FVector& IVelocity,
 	IAimingRotation = GetControlRotation();
 }
 
+void AProject_ZSCharacter::SetRotationMode_Implementation(ERotationMode& NewRotationMode)
+{
+	if (NewRotationMode != RotationMode)
+	{
+		OnRotationModeChanged(NewRotationMode);
+	}
+	
+}
+
+FTransform AProject_ZSCharacter::Get3PPivotTarget_Implementation()
+{
+
+	FVector Head = GetMesh()->GetSocketLocation("head");
+	FVector root = GetMesh()->GetSocketLocation("root");
+	FVector Meadian = (Head + root) / 2;
+	
+	return FTransform(GetActorRotation(), Meadian, FVector(1.f));
+}
+
+void AProject_ZSCharacter::GetCameraParameters_Implementation(float& outTPFOV, float& outFPFOV, bool& outRightShoulder)
+{
+	outTPFOV = ThridPersionFOV;
+	outFPFOV = FirstPersionFOV;
+	outRightShoulder = bRightShoulder;
+}
+
+void AProject_ZSCharacter::Get3PParams_Implementation(FVector& outTraceOrgins, float& outTraceRadius, TEnumAsByte<ETraceTypeQuery>& outTraceChannel)
+{
+	if (bRightShoulder)
+	{
+		outTraceOrgins = GetMesh()->GetSocketLocation("TP_CameraTrace_R");
+		outTraceRadius = 15.0f;
+		outTraceChannel = UEngineTypes::ConvertToTraceType(ECC_Camera);
+	}
+	else
+	{
+		outTraceOrgins = GetMesh()->GetSocketLocation("TP_CameraTrace_L");
+		outTraceRadius = 15.0f;
+		outTraceChannel = UEngineTypes::ConvertToTraceType(ECC_Camera);
+	}
+}
+
+void AProject_ZSCharacter::GetFPCameraTarget_Implementation(FVector& FPTarget)
+{
+	FPTarget = GetMesh()->GetSocketLocation("FP_Camera");
+}
+
 void AProject_ZSCharacter::OnMovementStateChanged(EMovementState NewMovementState)
 {
 	EMovementState PreviousMovementState;
@@ -312,6 +365,89 @@ void AProject_ZSCharacter::WalkAction()
 	default:
 		break;
 	}
+}
+
+void AProject_ZSCharacter::CameraSwitch()
+{
+	bRightShoulder = !bRightShoulder;
+}
+
+void AProject_ZSCharacter::AimActionPressed()
+{
+	bAiming = true;
+	ERotationMode TempRot = ERotationMode::ERM_Aiming;
+	SetRotationMode_Implementation(TempRot);
+}
+void AProject_ZSCharacter::AimActionReleased()
+{
+	bAiming = false;
+	ERotationMode TempRot = ERotationMode::ERM_LookingDirection;
+	switch (ViewMode)
+	{
+	case EViewMode::EVM_ThirdPerson:
+		SetRotationMode_Implementation(DesiredRotationMode);
+		break;
+	case EViewMode::EVM_FirstPerson:
+		SetRotationMode_Implementation(TempRot);
+		break;
+	default:
+		break;
+	}
+}
+
+void AProject_ZSCharacter::CalculateCrosshairSpread(float DeltaTime)
+{
+	FVector2D WalkSpeedRange{ 0.f,600.f };
+	FVector2D VeclocityMultiplierRange{ 0.f,1.f };
+	FVector Velocity{ GetVelocity() };
+	Velocity.Z = 0.f;
+	// Calculate crosshair in Velocity factor
+	CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(
+		WalkSpeedRange, VeclocityMultiplierRange,
+		Velocity.Size());
+
+	// Calculate crosshair in air factor
+	if (GetCharacterMovement()->IsFalling()) // is in air ?
+	{
+		// Spread the crosshair slowly while in air
+		CrosshairInAirFactor = FMath::FInterpTo
+		(CrosshairInAirFactor, 2.25f, DeltaTime, 2.25f);
+	}
+	else // character on the ground
+	{
+		// Shrink the crosshairs rapidly while on the ground
+		CrosshairInAirFactor = FMath::FInterpTo
+		(CrosshairInAirFactor, 0.f, DeltaTime, 30.f);
+	}
+	// Calculate crosshair Aim Factor
+	if (bAiming) // Are we aiming
+	{
+		// Shrink crosshair a small amount quickly
+		CrosshairAimFactor = FMath::FInterpTo(CrosshairAimFactor, 0.8f, DeltaTime, 30.f);
+	}
+	else
+	{
+		// Spread Crosshair back to very quickly
+		CrosshairAimFactor = FMath::FInterpTo(CrosshairAimFactor, 0.f, DeltaTime, 30.f);
+	}
+	// True 0.05s after firing
+	if (bAiming)
+	{
+		CorsshairShootingFactor = FMath::FInterpTo
+		(CorsshairShootingFactor, 0.3f, DeltaTime, 60.f);
+	}
+	else
+	{
+		CorsshairShootingFactor = FMath::FInterpTo
+		(CorsshairShootingFactor, 0.0f, DeltaTime, 60.f);
+	}
+
+	CrosshairSpreadMultiplier = 0.5f + CrosshairVelocityFactor + CrosshairInAirFactor - CrosshairAimFactor + CorsshairShootingFactor;
+}
+
+float AProject_ZSCharacter::GetCrosshairSpreadMultiplier()
+{
+	return CrosshairSpreadMultiplier;
 }
 
 #pragma region Input Functions
@@ -382,6 +518,13 @@ void AProject_ZSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		
 		// Crouching
 		EnhancedInputComponent->BindAction(ICrouchAction, ETriggerEvent::Started, this, &AProject_ZSCharacter::StanceAction);
+
+		// SoulderSwap
+		EnhancedInputComponent->BindAction(ShoulderSwap, ETriggerEvent::Started, this, &AProject_ZSCharacter::CameraSwitch);
+
+		// StartAim
+		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Started, this, &AProject_ZSCharacter::AimActionPressed);
+		EnhancedInputComponent->BindAction(AimAction, ETriggerEvent::Completed, this, &AProject_ZSCharacter::AimActionReleased);
 
 
 	}
@@ -582,7 +725,43 @@ void AProject_ZSCharacter::UpdateGroundedRotation()
 {
 	if (CanUpdateMovingRotation())
 	{
-		FRotator  TargRot = FRotator(0.f, LastVelocityRotation.Yaw, 0.f);
+		FRotator VelocityDirection = FRotator(0.f, LastVelocityRotation.Yaw , 0.f);
+		FRotator ActorRot = FRotator(0.f, GetControlRotation().Yaw + GetAnimCurveValue("YawOffset"), 0.f);
+		FRotator ActorAimingRot = FRotator(0.f, GetControlRotation().Yaw, 0.f);
+
+		switch (RotationMode)
+		{
+		case ERotationMode::ERM_VelocityDirection:
+			SmoothChracterRotation(VelocityDirection, 800.f, CalculateGroundRotationRate());
+			break;
+		case ERotationMode::ERM_LookingDirection:
+
+			switch (Gait)
+			{
+			case EGait::EGT_Walking:
+				
+				SmoothChracterRotation(ActorRot, 500.f, CalculateGroundRotationRate());
+				break;
+			case EGait::EGT_Running:
+				SmoothChracterRotation(ActorRot, 500.f, CalculateGroundRotationRate());
+				break;
+			case EGait::EGT_Sprinting:
+				SmoothChracterRotation(VelocityDirection, 500.f, CalculateGroundRotationRate());
+				break;
+			default:
+				break;
+			}
+
+
+			break;
+		case ERotationMode::ERM_Aiming:
+			SmoothChracterRotation(ActorAimingRot, 1000.f, 20.f);
+			break;
+		default:
+			break;
+		}
+
+		/*FRotator  TargRot = FRotator(0.f, LastVelocityRotation.Yaw, 0.f);
 		if (RotationMode == ERotationMode::ERM_LookingDirection)
 		{
 			if (Gait == EGait::EGT_Walking || Gait == EGait::EGT_Running)
@@ -596,22 +775,59 @@ void AProject_ZSCharacter::UpdateGroundedRotation()
 
 			}
 		}
+		else if (RotationMode == ERotationMode::ERM_VelocityDirection)
+		{
+			SmoothChracterRotation(FRotator(0.f, LastVelocityRotation.Yaw, 0.f), 800.f, CalculateGroundRotationRate());
+		}
 		else if (RotationMode == ERotationMode::ERM_Aiming)
 		{
-			SmoothChracterRotation(FRotator(0.f, GetControlRotation().Yaw, 0.f), 1000, CalculateGroundRotationRate());
-		}
+			SmoothChracterRotation(FRotator(0.f, GetControlRotation().Yaw, 0.f), 1000.f, 20.f);
+		}*/
 	}
 	else
 	{
-		if (RotationMode == ERotationMode::ERM_LookingDirection)
+		switch (ViewMode)
 		{
-			RotationAmout();
-		}
-		else if (RotationMode == ERotationMode::ERM_Aiming)
-		{
+		case EViewMode::EVM_ThirdPerson:
+
+			switch (RotationMode)
+			{
+			case ERotationMode::ERM_VelocityDirection:
+				RotationAmout();
+				break;
+			case ERotationMode::ERM_LookingDirection:
+				RotationAmout();
+				break;
+			case ERotationMode::ERM_Aiming:
+				LimitRotation(-100.f, 100.f, 20.f);
+				RotationAmout();
+				
+				break;
+			default:
+				break;
+			}
+
+			break;
+		case EViewMode::EVM_FirstPerson:
 			LimitRotation(-100.f, 100.f, 20.f);
 			RotationAmout();
+
+			break;
+		default:
+			break;
 		}
+	
+
+
+		//if (RotationMode == ERotationMode::ERM_LookingDirection)
+		//{
+		//	RotationAmout();
+		//}
+		//else if (RotationMode == ERotationMode::ERM_Aiming)
+		//{
+		//	LimitRotation(-100.f, 100.f, 20.f);
+		//	RotationAmout();
+		//}
 	}
 
 }
@@ -846,18 +1062,23 @@ float AProject_ZSCharacter::GetAnimCurveValue(FName CurveName)
 void AProject_ZSCharacter::LimitRotation(float AnimYawMin, float AnimYawMax, float InterpSpeed)
 {
 	FRotator m_RotationDelta = UKismetMathLibrary::NormalizedDeltaRotator(GetControlRotation(), GetActorRotation());
-	if (UKismetMathLibrary::InRange_FloatFloat(m_RotationDelta.Yaw,AnimYawMin, AnimYawMax))
-	{
-		float AimRot = m_RotationDelta.Yaw > 0.f ? GetControlRotation().Yaw + AnimYawMin : GetControlRotation().Yaw + AnimYawMax;
-		SmoothChracterRotation(FRotator(0.f, AimRot, 0.f), 0.f, InterpSpeed);
+	bool m_bInRange = UKismetMathLibrary::InRange_FloatFloat(m_RotationDelta.Yaw, AnimYawMin, AnimYawMax);
+	if (m_bInRange == false)
+	{ 
+		FRotator AimRot = FRotator(0.0f);
+		AimRot.Yaw = m_RotationDelta.Yaw > 0.f ? GetControlRotation().Yaw + AnimYawMin : GetControlRotation().Yaw + AnimYawMax;
+		UE_LOG(LogTemp, Warning, TEXT("m_RotationDelta: %f"), m_RotationDelta.Yaw);
+		SmoothChracterRotation(AimRot, 0.f, InterpSpeed);
 	}
 }
 void AProject_ZSCharacter::RotationAmout()
 {
-	if (abs(GetAnimCurveValue("RotationAmount") > 0.001))
+	float RotationAmount = GetAnimCurveValue("RotationAmount");
+	if (abs(RotationAmount > 0.001f))
 	{
-		float ActorRotationYaw = GetAnimCurveValue("RotationAmount") * (GetWorld()->GetDeltaSeconds() / (1.f / 30.f));
-		AddActorWorldRotation(FRotator(0.f, ActorRotationYaw, 0.f));
+		FRotator ActorRotation = FRotator(0.f);
+		ActorRotation.Yaw = RotationAmount * (GetWorld()->GetDeltaSeconds() / (1.f / 30.f));
+		AddActorWorldRotation(ActorRotation);
 		TargetRotation = GetActorRotation();
 	}
 }

@@ -40,11 +40,11 @@ public:
 	void GetCurrentStates(TEnumAsByte<EMovementMode>& PawnMovementMode, EMovementState& MovementStates, EMovementState& PrevMovementStates, EMovementAction& MovemeentAction, ERotationMode& RotationModes, EGait& ActualGaits, EStance& ActualStance, EViewMode& ViewModes, EOverlayState& Overlays);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Essential Values")
-	void SetOverlayState(EOverlayState Overlays);
+	void SetOverlayState(EOverlayState& Overlays);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Essential Values")
-	void SetRotationMode(ERotationMode Rotations);
+	void SetRotationMode(ERotationMode& Rotations);
 
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Essential Values")
-	void SetViewMode(EViewMode ViewModes);
+	void SetViewMode(EViewMode& ViewModes);
 };

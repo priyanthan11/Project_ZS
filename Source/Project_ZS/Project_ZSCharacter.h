@@ -8,6 +8,7 @@
 
 //#include "ZS_Enums.h"
 #include "ZS_Interface.h"
+#include "ZS_CameraInterface.h"
 #include "ZS_Struct.h"
 
 
@@ -30,7 +31,7 @@ struct FInputActionValue;
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
 UCLASS(config=Game)
-class AProject_ZSCharacter : public ACharacter, public IZS_Interface
+class AProject_ZSCharacter : public ACharacter, public IZS_Interface, public IZS_CameraInterface
 {
 	GENERATED_BODY()
 
@@ -67,6 +68,12 @@ class AProject_ZSCharacter : public ACharacter, public IZS_Interface
 	/** Crouch Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ICrouchAction;
+	/** Shoulder Swap Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ShoulderSwap;
+	/** Aim Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* AimAction;
 
 	// Interface
 	IZS_Interface* ZS_Interface;
@@ -134,6 +141,30 @@ class AProject_ZSCharacter : public ACharacter, public IZS_Interface
 
 
 #pragma endregion
+#pragma region Camera Variables
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera Variables", meta = (AllowPrivateAccess = "true"))
+	bool bRightShoulder;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera Variables", meta = (AllowPrivateAccess = "true"))
+	float ThridPersionFOV;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera Variables", meta = (AllowPrivateAccess = "true"))
+	float FirstPersionFOV;
+#pragma endregion
+
+#pragma region Crosshair
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crosshair Variables", meta = (AllowPrivateAccess = "true"))
+	float CrosshairSpreadMultiplier;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crosshair Variables", meta = (AllowPrivateAccess = "true"))
+	float CrosshairVelocityFactor;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crosshair Variables", meta = (AllowPrivateAccess = "true"))
+	float CrosshairInAirFactor;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crosshair Variables", meta = (AllowPrivateAccess = "true"))
+	float CrosshairAimFactor;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crosshair Variables", meta = (AllowPrivateAccess = "true"))
+	float CorsshairShootingFactor;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crosshair Variables", meta = (AllowPrivateAccess = "true"))
+	bool bAiming;
+#pragma endregion
+
 public:
 	AProject_ZSCharacter();
 	
@@ -217,6 +248,15 @@ protected:
 	virtual void GetEssentialValues_Implementation(FVector & IVelocity, 
 		FVector & IAcceleration, FVector & IMovementInput, bool& IIsMoving, 
 		bool& IHasMovementInput, float& ISpeed, float& IMovementInputAmount, float& IAimYawRate, FRotator & IAimingRotation) override;
+	virtual void SetRotationMode_Implementation(ERotationMode& NewRotationMode) override;
+
+#pragma region Camera Interface
+	virtual FTransform Get3PPivotTarget_Implementation() override;
+	virtual void GetCameraParameters_Implementation(float& outTPFOV, float& outFPFOV, bool& outRightShoulder) override;
+	virtual void Get3PParams_Implementation(FVector & outTraceOrgins, float& outTraceRadius, TEnumAsByte<ETraceTypeQuery>&outTraceChannel) override;
+	virtual void GetFPCameraTarget_Implementation(FVector & FPTarget) override;
+
+#pragma endregion
 
 #pragma endregion
 #pragma region Value Change
@@ -233,9 +273,18 @@ protected:
 	void StanceAction();
 	UFUNCTION(BlueprintCallable)
 	void WalkAction();
-	
+	UFUNCTION(BlueprintCallable)
+	void CameraSwitch();
+	UFUNCTION(BlueprintCallable)
+	void AimActionPressed();
+	UFUNCTION(BlueprintCallable)
+	void AimActionReleased();
 #pragma endregion
-
+#pragma region Crosshair
+	void CalculateCrosshairSpread(float DeltaTime);
+	UFUNCTION(BlueprintPure)
+	float GetCrosshairSpreadMultiplier();
+#pragma endregion
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
