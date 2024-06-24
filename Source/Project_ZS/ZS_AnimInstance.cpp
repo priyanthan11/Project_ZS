@@ -9,9 +9,101 @@
 #include "Components/CapsuleComponent.h"
 #pragma endregion
 
-UZS_AnimInstance::UZS_AnimInstance():
+UZS_AnimInstance::UZS_AnimInstance() :
+#pragma region Initialization
 	Condition(true),
-	PreviousCondtion(Condition)
+	PreviousCondtion(Condition),
+	
+
+#pragma region Character Information
+	AAimingRotation(0.f),
+	AVelocity(0.f),
+	AAcceleration(0.f),
+	bAHasMovementInput(false),
+	bAIsMoving(false),
+	ASpeed(0.f),
+	AMovementInput(0.f),
+	AAimYawRate(0.f),
+	AI_MovementMode(EMovementMode::MOVE_None),
+	AI_MovementAction(EMovementAction::EMA_LowMantle),
+	AI_RotationMode(ERotationMode::ERM_VelocityDirection),
+	AI_Gait(EGait::EGT_Running),
+	AI_Stance(EStance::EMA_Standing),
+	AI_ViewMode(EViewMode::EVM_ThirdPerson),
+	AI_OverlayState(EOverlayState::EOS_Default),
+#pragma endregion
+#pragma region AnimGraph Grounded
+	AI_GroundEntryState(EGroundEntryState::EGE_None),
+	MovementDirection(EMovementDirection::EMD_Forward),
+	TrackedHipDirection(EHipDirection::EHD_F),
+	RelativeAccelerationAmount(0.f),
+	RotateL(false),
+	RotateR(false),
+	Pivot(false),
+	RotateRate(1.f),
+	RotationScale(0.f),
+	DiagonalScaleAmount(0.f),
+	WalkRunBlend(0.f),
+	StandingPlayRate(1.f),
+	CrouchingPlayRate(1.f),
+	StrideBlend(0.f),
+	FYaw(0.f),
+	BYaw(0.f),
+	LYaw(0.f),
+	RYaw(0.f),
+#pragma endregion
+#pragma region AnimGraph InAir
+	JumpPlayRate(1.2f),
+	FallSpeed(0.f),
+	LandPrediction(1.f),
+#pragma endregion
+#pragma region AnimGraph Aiming Values
+	SmoothedAimingRotation(0.f),
+	SpineRotation(0.f),
+	AimingAngle(0.f),
+	SmoothedAimingAngle(0.f),
+	AimSweepTime(0.5f),
+	InputYawOffsetTime(0.f),
+	ForwardYawTime(0.f),
+	LeftYawTime(0.f),
+	RightYawTime(0.f),
+#pragma endregion
+#pragma region AnimGraph LayerBlending
+	EnableAimOffset(1.f),
+	BasePoseN(1.f),
+	BasePoseCLF(0.f),
+	ArmLAdd(0.f),
+	ArmLLS(0.f),
+	ArmLMS(0.f),
+	ArmRAdd(0.f),
+	ArmRLS(0.f),
+	ArmRMS(0.f),
+	HandL(0.f),
+	HandR(0.f),
+	SpineAdd(0.f),
+	HeadAdd(0.f),
+	EnableHandIKL(1.f),
+	EnableHandIKR(1.f),
+
+#pragma endregion
+#pragma region AnimGraph FootIK
+FootLockLAlpha(0.f),
+FootLockLLocation(0.f),
+FootLockLRotation(0.f),
+FootLockRAlpha(0.f),
+FootLockRLocation(0.f),
+FootLockRRotation(0.f),
+FootOffsetLLocation(0.f),
+FootOffsetLRotation(0.f),
+FootOffsetRLocation(0.f),
+FootOffsetRRotation(0.f),
+#pragma endregion
+#pragma region AnimGraph Turn In Place
+	ElapsedDelayTime(0.f)
+
+#pragma endregion
+
+#pragma endregion
 {
 }
 
@@ -36,7 +128,7 @@ void UZS_AnimInstance::UpdateAnimationProperties(float DeltaTime)
 			UpdateCharacterInfor();
 			UpdateAimingValues();
 			UpdateLayerValues();
-			// UpdateFootIK();
+			UpdateFootIK();
 			switch (AI_MovementState)
 			{
 			case EMovementState::EMS_NONE:
@@ -179,6 +271,29 @@ void UZS_AnimInstance::UpdateLayerValues()
 	ArmRMS = UKismetMathLibrary::FFloor(ArmRLS) - 1;
 }
 
+void UZS_AnimInstance::UpdateFootIK()
+{
+	
+
+	SetFootLocking("Enable_FootIK_L", "FootLock_L", "ik_foot_l", FootLockLAlpha, FootLockLLocation, FootOffsetLRotation);
+	SetFootLocking("Enable_FootIK_R", "FootLock_R", "ik_foot_r", FootLockRAlpha, FootLockRLocation, FootOffsetRRotation);
+	if (AI_MovementState == EMovementState::EMS_NONE || AI_MovementState == EMovementState::EMS_Grounded || AI_MovementState == EMovementState::EMS_Mantling)
+	{
+		FVector FootOffsetLTarget, FootOffsetRTarget;
+		SetFootOffset("Enable_FootIK_L","ik_foot_l","root",FootOffsetLTarget,FootOffsetLLocation,FootOffsetLRotation);
+		SetFootOffset("Enable_FootIK_R", "ik_foot_r", "root", FootOffsetRTarget, FootOffsetRLocation, FootOffsetRRotation);
+		SetPelvisIKOffset(FootOffsetLTarget, FootOffsetRTarget);
+	}
+	else if (AI_MovementState == EMovementState::EMS_InAir)
+	{
+		SetPelvisIKOffset(FVector(0.f), FVector(0.f));
+		ResetIKOffsets();
+	}
+
+
+
+}
+
 void UZS_AnimInstance::DoWhileMoving()
 {
 	UpdateMovementValues();
@@ -213,13 +328,10 @@ void UZS_AnimInstance::DoWhileLoop()
 			ElapsedDelayTime = 0.f;
 			RotateL = false;
 			RotateR = false;
-			UE_LOG(LogTemp, Warning, TEXT("WhileLoop: Started to Move"));
-			
 		}
 		//WhileTrue();
 		// Do While Moving
 		DoWhileMoving();
-		UE_LOG(LogTemp, Warning, TEXT("WhileLoop: Moving"));
 	}
 	else
 	{
@@ -227,14 +339,11 @@ void UZS_AnimInstance::DoWhileLoop()
 		{
 			DoOnce.Reset();
 			//ChangedToFalse();
-			
 		}
 		//WhileFalse();
 		// Do While Not Moving
 		DoWhileNotMoving();
-		UE_LOG(LogTemp, Warning, TEXT("WhileLoop: Not Moving"));
 	}
-
 
 }
 
@@ -289,25 +398,28 @@ FVelocityBlend UZS_AnimInstance::CalculateVelocityBlend()
 	/*Calculate the Velocity Blend. This value represents the velocity amount of the actor in each direction
 	(normalized so that diagonals equal 0.5 for each direction), and is used in a BlendMulti node to produce better
 	directional blending than a standard blend space.*/
-	FVector NVector = AVelocity.GetSafeNormal(0.1f);
+	//FVector NVector = AVelocity.GetSafeNormal(0.1f);
 
-	FVector LocRelativeVelocityDir = PlayerCharacter->GetActorRotation().UnrotateVector(NVector);
+	//FVector LocRelativeVelocityDir = UKismetMathLibrary::Quat_UnrotateVector(PlayerCharacter->GetActorRotation().Quaternion(), AVelocity.GetSafeNormal(0.1f));
+	
+	FVector LocRelativeVelocityDir = PlayerCharacter->GetActorRotation().UnrotateVector(AVelocity.GetSafeNormal(0.1));
 
 
-	float AbsX = abs(LocRelativeVelocityDir.X);
+	/*float AbsX = abs(LocRelativeVelocityDir.X);
 	float AbsY = abs(LocRelativeVelocityDir.Y);
-	float AbsZ = abs(LocRelativeVelocityDir.Z);
-	float Sum = AbsX + AbsY + AbsZ;
+	float AbsZ = abs(LocRelativeVelocityDir.Z);*/
+	float Sum = abs(LocRelativeVelocityDir.X) + abs(LocRelativeVelocityDir.Y) + abs(LocRelativeVelocityDir.Z);
 
 	// Normalize based on the sum
 	FVector RelativeDirection = LocRelativeVelocityDir / Sum;
 
 	FVelocityBlend temp;
 
-	temp.F = FMath::Clamp(RelativeDirection.X, 0.0f, 1.0f);
-	temp.B = abs(FMath::Clamp(RelativeDirection.X, -1.0f, 0.0f));
-	temp.L = abs(FMath::Clamp(RelativeDirection.Y, -1.0f, 0.0f));
-	temp.R = FMath::Clamp(RelativeDirection.Y, 0.0f, 1.0f);
+	temp.F = UKismetMathLibrary::FClamp(RelativeDirection.X, 0.0f, 1.0f);
+	temp.B = abs(UKismetMathLibrary::FClamp(RelativeDirection.X, -1.0f, 0.0f));
+	temp.L = abs(UKismetMathLibrary::FClamp(RelativeDirection.Y, -1.0f, 0.0f));
+	temp.R = UKismetMathLibrary::FClamp(RelativeDirection.Y, 0.0f, 1.0f);
+
 
 	return temp;
 }
@@ -414,7 +526,6 @@ FVector UZS_AnimInstance::CalculateRelativeAccelerationAmount()
 	{
 		FVector VecClMax = UKismetMathLibrary::Vector_ClampSizeMax(AAcceleration, PlayerCharacter->GetCharacterMovement()->GetMaxBrakingDeceleration());
 		return UKismetMathLibrary::Quat_UnrotateVector(PlayerCharacter->GetActorRotation().Quaternion(), VecClMax / PlayerCharacter->GetCharacterMovement()->GetMaxBrakingDeceleration());
-
 	}
 	return FVector();
 }
@@ -449,7 +560,7 @@ EMovementDirection UZS_AnimInstance::CalculateMovementDirection()
 	}
 
 
-	return EMovementDirection();
+	//return EMovementDirection();
 }
 
 EMovementDirection UZS_AnimInstance::CalculateQuadrant(EMovementDirection MovementDir, float FR_Threshold, float FL_Threshold, float BR_Threshold, float BL_Threshold, float Buffer, float Angle)
@@ -473,7 +584,7 @@ EMovementDirection UZS_AnimInstance::CalculateQuadrant(EMovementDirection Moveme
 			return EMovementDirection::EMD_Backward;
 		}
 
-	return EMovementDirection();
+	//return EMovementDirection();
 }
 
 bool UZS_AnimInstance::AngleInRange(float Angle, float MinAngle, float MaxAngle, float buffer, bool IncreaseBuffer)
@@ -488,7 +599,7 @@ bool UZS_AnimInstance::AngleInRange(float Angle, float MinAngle, float MaxAngle,
 	}
 
 
-	return false;
+	//return false;
 }
 
 bool UZS_AnimInstance::CanRotateInPlace()
@@ -511,11 +622,12 @@ void UZS_AnimInstance::RotateInPlaceCheck()
 		with the Aim Yaw Rate. This makes the character rotate faster when moving the camera faster.*/
 		if (RotateL || RotateR)
 		{
+			//AAimingRotation;
 			RotateRate = UKismetMathLibrary::MapRangeClamped(AAimYawRate,
 				90.f /* Aim Yaw Rate Min Range*/,
 				270.f /* Aim Yaw Rate Max Rang*/,
 				1.15f /*Min Play Rate*/,
-				3.f/*Max Play Rate*/);
+				3.0f/*Max Play Rate*/);
 		}
 
 
@@ -543,7 +655,8 @@ void UZS_AnimInstance::TurnInPlaceCheck()
 
 		float TurnCheckMinAngle = 45.f;
 		float AimYawRateLimite = 50.f;
-		if (abs(AimingAngle.X) > TurnCheckMinAngle && AAimYawRate < AimYawRateLimite)
+		float t_AimingAngle = abs(AimingAngle.X);
+		if (t_AimingAngle > TurnCheckMinAngle && AAimYawRate < AimYawRateLimite)
 		{
 			ElapsedDelayTime += DeltaX;
 
@@ -551,15 +664,13 @@ void UZS_AnimInstance::TurnInPlaceCheck()
 			/*Step 2: Check if the Elapsed Delay time exceeds the set delay 
 			(mapped to the turn angle range). If so, trigger a Turn In Place.*/
 
-			float Cfloat = UKismetMathLibrary::MapRangeClamped(abs(AimingAngle.X), TurnCheckMinAngle, 180.f, 0.75f /* min Angle Delay*/, 0.0f /*Max Angle Delay*/);
+			float Cfloat = UKismetMathLibrary::MapRangeClamped(t_AimingAngle, TurnCheckMinAngle, 180.f, 0.75f /* min Angle Delay*/, 0.0f /*Max Angle Delay*/);
 
 			if (ElapsedDelayTime > Cfloat)
 			{
-				FRotator tempRot = FRotator(0.0f, AAimingRotation.Yaw, 0.0f);
-				TurnInPlace(tempRot, 1.0f, 0.0f, false);
+				//FRotator tempRot = FRotator(0.0f, AAimingRotation.Yaw, 0.0f);
+				TurnInPlace(FRotator(0.0f, AAimingRotation.Yaw, 0.0f), 1.0f, 0.0f, false);
 			}
-
-
 		}
 		else
 		{
@@ -614,7 +725,7 @@ void UZS_AnimInstance::TurnInPlace(FRotator TargetRotation, float PlayRateScale,
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("TurnInPlace: 1st Check else"));
+		
 		if (TurnAngle < 0.0f)
 		{
 			switch (AI_Stance)
@@ -675,15 +786,15 @@ void UZS_AnimInstance::PlayDynamicTransition(float ReTriggerDelay, FDynamicMonta
 
 	FTimerHandle DelayTimer;
 	GetWorld()->GetTimerManager().SetTimer(DelayTimer, this, &UZS_AnimInstance::MakeTheGateOpen, ReTriggerDelay, false);
-	//UE_LOG(LogTemp, Warning, TEXT("Gate is closed "));
+	
 	if (Gates.IsOpen())
 	{
 		PlaySlotAnimationAsDynamicMontage(Parameters.Animation, "Grounded Slot", Parameters.BlendInTime, Parameters.BlendOutTime, Parameters.PlayRate, 1, 0.0, Parameters.StartTime);
-		//UE_LOG(LogTemp, Warning, TEXT("Gate is Opened "));
+		
 	}
 	Gates.Close();
 
-	//UE_LOG(LogTemp, Warning, TEXT("Gate is working "));
+	
 }
 
 void UZS_AnimInstance::DynamicTranstionCheck()
@@ -700,7 +811,7 @@ void UZS_AnimInstance::DynamicTranstionCheck()
 	FVector VBFootL = PlayerCharacter->GetMesh()->GetSocketLocation("VB foot_target_l");
 
 	float TempL = FVector::Distance(IKFootL, VBFootL);
-	//UE_LOG(LogTemp, Warning, TEXT("TempL: %f"),TempL);
+	
 	if (TempL > 8.0f)
 	{
 		// PlayDynamic Transition
@@ -737,6 +848,22 @@ void UZS_AnimInstance::DynamicTranstionCheck()
 void UZS_AnimInstance::MakeTheGateOpen()
 {
 	Gates.Open();
+}
+
+void UZS_AnimInstance::SetFootLocking(FName EnableFootIkCurve, FName FootLockCurve, FName IKFootBone, float& FootLockAlpha, FVector& FootLocation, FRotator& FootLockRotation)
+{
+}
+
+void UZS_AnimInstance::SetFootOffset(FName EnableFootIkCurve, FName IKFootBone, FName RootBone, FVector& CurrentLocationTarget, FVector& CurrentLocationOffset, FRotator& CurrentRotationOffset)
+{
+}
+
+void UZS_AnimInstance::SetPelvisIKOffset(FVector FootOffsetLTarget, FVector FootOffsetRTarget)
+{
+}
+
+void UZS_AnimInstance::ResetIKOffsets()
+{
 }
 
 void UZS_AnimInstance::UpdateInAirValues()

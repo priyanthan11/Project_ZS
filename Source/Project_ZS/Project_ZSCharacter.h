@@ -149,7 +149,10 @@ class AProject_ZSCharacter : public ACharacter, public IZS_Interface, public IZS
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camera Variables", meta = (AllowPrivateAccess = "true"))
 	float FirstPersionFOV;
 #pragma endregion
-
+#pragma region Input Action Variable
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input Action", meta = (AllowPrivateAccess = "true"))
+	bool bIsRifle;
+#pragma endregion
 #pragma region Crosshair
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crosshair Variables", meta = (AllowPrivateAccess = "true"))
 	float CrosshairSpreadMultiplier;
@@ -249,7 +252,7 @@ protected:
 		FVector & IAcceleration, FVector & IMovementInput, bool& IIsMoving, 
 		bool& IHasMovementInput, float& ISpeed, float& IMovementInputAmount, float& IAimYawRate, FRotator & IAimingRotation) override;
 	virtual void SetRotationMode_Implementation(ERotationMode& NewRotationMode) override;
-
+	virtual void SetOverlayState_Implementation(EOverlayState & Overlays) override;
 #pragma region Camera Interface
 	virtual FTransform Get3PPivotTarget_Implementation() override;
 	virtual void GetCameraParameters_Implementation(float& outTPFOV, float& outFPFOV, bool& outRightShoulder) override;
@@ -264,10 +267,11 @@ protected:
 	void OnGaitChanged(EGait NewActualGait);
 	void OnRotationModeChanged(ERotationMode NewRotationMode);
 	void OnStanceChanged(EStance NewStance);
+	void OnOverlayStateChanged(EOverlayState NewOverlayState);
 #pragma endregion
 #pragma region Input
 	UFUNCTION(BlueprintCallable)
-	void SprintAction(TEnumAsByte<EGait> t_DesirdGait);
+	void SprintAction(EGait t_DesirdGait);
 	void SprintPressed();
 	void SprintReleased();
 	void StanceAction();
@@ -279,6 +283,12 @@ protected:
 	void AimActionPressed();
 	UFUNCTION(BlueprintCallable)
 	void AimActionReleased();
+	UFUNCTION(BlueprintCallable)
+	void PickRifle();
+
+
+
+
 #pragma endregion
 #pragma region Crosshair
 	void CalculateCrosshairSpread(float DeltaTime);

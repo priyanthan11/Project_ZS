@@ -103,7 +103,6 @@ void AZS_PlayerCameraManager::UpdateCustomCamera(FVector& Location, FRotator& Ro
 	if (HitResult.bBlockingHit && !HitResult.bStartPenetrating)
 	{
 		TargetCameraLocation += (HitResult.Location - HitResult.TraceEnd);
-		//UE_LOG(LogTemp, Warning, TEXT("TargetCameraLocation"));
 	}
 
 	/*Step 7: Draw Debug Shapes.*/

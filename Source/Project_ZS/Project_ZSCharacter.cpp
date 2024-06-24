@@ -34,7 +34,7 @@ AProject_ZSCharacter::AProject_ZSCharacter():
 	Gait(EGait::EGT_Walking),
 	Stance(EStance::EMA_Standing),
 	ViewMode(EViewMode::EVM_ThirdPerson),
-	OverlayState(EOverlayState::EOS_Default),
+	OverlayState(EOverlayState::EOS_Rifle),
 
 	DesiredRotationMode(ERotationMode::ERM_LookingDirection),
 	DesiredGait(EGait::EGT_Running),
@@ -57,7 +57,10 @@ AProject_ZSCharacter::AProject_ZSCharacter():
 #pragma region Camera
 	ThridPersionFOV(90.f),
 	FirstPersionFOV(90.f),
-	bRightShoulder(true)
+	bRightShoulder(true),
+#pragma endregion
+#pragma region Input Action Varuables
+	bIsRifle(false)
 #pragma endregion
 #pragma endregion
 
@@ -289,6 +292,14 @@ void AProject_ZSCharacter::SetRotationMode_Implementation(ERotationMode& NewRota
 	
 }
 
+void AProject_ZSCharacter::SetOverlayState_Implementation(EOverlayState& Overlays)
+{
+	if (Overlays != OverlayState)
+	{
+		OnOverlayStateChanged(Overlays);
+	}
+}
+
 FTransform AProject_ZSCharacter::Get3PPivotTarget_Implementation()
 {
 
@@ -349,6 +360,11 @@ void AProject_ZSCharacter::OnStanceChanged(EStance NewStance)
 	EStance PreviousStance;
 	SetPreviousAndNewValue(NewStance, Stance, PreviousStance);
 }
+void AProject_ZSCharacter::OnOverlayStateChanged(EOverlayState NewOverlayState)
+{
+	EOverlayState PreviousOverlayState;
+	SetPreviousAndNewValue(NewOverlayState, OverlayState, PreviousOverlayState);
+}
 void AProject_ZSCharacter::WalkAction()
 {
 	switch (DesiredGait)
@@ -393,6 +409,19 @@ void AProject_ZSCharacter::AimActionReleased()
 	default:
 		break;
 	}
+}
+
+void AProject_ZSCharacter::PickRifle()
+{
+	bIsRifle = !bIsRifle;
+	EOverlayState temr =  EOverlayState::EOS_Rifle;
+	EOverlayState temd = EOverlayState::EOS_Default;
+	
+
+	if (bIsRifle)
+		SetOverlayState_Implementation(temr);
+	else
+		SetOverlayState_Implementation(temd);
 }
 
 void AProject_ZSCharacter::CalculateCrosshairSpread(float DeltaTime)
@@ -451,7 +480,7 @@ float AProject_ZSCharacter::GetCrosshairSpreadMultiplier()
 }
 
 #pragma region Input Functions
-void AProject_ZSCharacter::SprintAction(TEnumAsByte<EGait> t_DesirdGait)
+void AProject_ZSCharacter::SprintAction(EGait t_DesirdGait)
 {
 	DesiredGait = t_DesirdGait;
 }
@@ -477,12 +506,10 @@ void AProject_ZSCharacter::StanceAction()
 		case EStance::EMA_Standing:
 			DesiredStance = EStance::EMA_Crouching;
 			Crouch();
-			UE_LOG(LogTemp,Warning,TEXT("Crouch: Crouching"));
 			break;
 		case EStance::EMA_Crouching:
 			DesiredStance = EStance::EMA_Standing;
 			UnCrouch();
-			UE_LOG(LogTemp, Warning, TEXT("Crouch: UnCrouch"));
 			break;
 		default:
 			break;
@@ -601,9 +628,6 @@ void AProject_ZSCharacter::SetEssentialValues()
 	{
 		LastMovementInputRotation = GetCharacterMovement()->GetCurrentAcceleration().Rotation();
 	}
-	
-
-
 	// Set the Speed of camera Rotation by Dividing differenc of Control rotation Yaw and previous AimYaw with deltaseconds
 	AimYawRate = abs((GetControlRotation().Yaw - PreviousAimYaw) / GetWorld()->GetDeltaSeconds());
 
@@ -725,45 +749,14 @@ void AProject_ZSCharacter::UpdateGroundedRotation()
 {
 	if (CanUpdateMovingRotation())
 	{
-		FRotator VelocityDirection = FRotator(0.f, LastVelocityRotation.Yaw , 0.f);
-		FRotator ActorRot = FRotator(0.f, GetControlRotation().Yaw + GetAnimCurveValue("YawOffset"), 0.f);
-		FRotator ActorAimingRot = FRotator(0.f, GetControlRotation().Yaw, 0.f);
-
-		switch (RotationMode)
+		FRotator VelocityDirection = FRotator(0.f, LastVelocityRotation.Yaw, 0.f);
+		if (RotationMode == ERotationMode::ERM_VelocityDirection)
 		{
-		case ERotationMode::ERM_VelocityDirection:
 			SmoothChracterRotation(VelocityDirection, 800.f, CalculateGroundRotationRate());
-			break;
-		case ERotationMode::ERM_LookingDirection:
-
-			switch (Gait)
-			{
-			case EGait::EGT_Walking:
-				
-				SmoothChracterRotation(ActorRot, 500.f, CalculateGroundRotationRate());
-				break;
-			case EGait::EGT_Running:
-				SmoothChracterRotation(ActorRot, 500.f, CalculateGroundRotationRate());
-				break;
-			case EGait::EGT_Sprinting:
-				SmoothChracterRotation(VelocityDirection, 500.f, CalculateGroundRotationRate());
-				break;
-			default:
-				break;
-			}
-
-
-			break;
-		case ERotationMode::ERM_Aiming:
-			SmoothChracterRotation(ActorAimingRot, 1000.f, 20.f);
-			break;
-		default:
-			break;
 		}
-
-		/*FRotator  TargRot = FRotator(0.f, LastVelocityRotation.Yaw, 0.f);
-		if (RotationMode == ERotationMode::ERM_LookingDirection)
+		else if (RotationMode == ERotationMode::ERM_LookingDirection)
 		{
+		
 			if (Gait == EGait::EGT_Walking || Gait == EGait::EGT_Running)
 			{
 				FRotator ActorRot = FRotator(0.f, GetControlRotation().Yaw + GetAnimCurveValue("YawOffset"), 0.f);
@@ -771,63 +764,34 @@ void AProject_ZSCharacter::UpdateGroundedRotation()
 			}
 			else
 			{
-				SmoothChracterRotation(FRotator(0.f, LastVelocityRotation.Yaw, 0.f), 500.f, CalculateGroundRotationRate());
-
+				SmoothChracterRotation(VelocityDirection, 500.f, CalculateGroundRotationRate());
 			}
 		}
-		else if (RotationMode == ERotationMode::ERM_VelocityDirection)
+		else
 		{
-			SmoothChracterRotation(FRotator(0.f, LastVelocityRotation.Yaw, 0.f), 800.f, CalculateGroundRotationRate());
+			FRotator ActorAimingRot = FRotator(0.f, GetControlRotation().Yaw, 0.f);
+			SmoothChracterRotation(ActorAimingRot, 1000.f, 20.f);
 		}
-		else if (RotationMode == ERotationMode::ERM_Aiming)
-		{
-			SmoothChracterRotation(FRotator(0.f, GetControlRotation().Yaw, 0.f), 1000.f, 20.f);
-		}*/
 	}
 	else
 	{
-		switch (ViewMode)
+		if (ViewMode == EViewMode::EVM_ThirdPerson)
 		{
-		case EViewMode::EVM_ThirdPerson:
-
-			switch (RotationMode)
+			if (RotationMode == ERotationMode::ERM_VelocityDirection || RotationMode == ERotationMode::ERM_LookingDirection)
 			{
-			case ERotationMode::ERM_VelocityDirection:
 				RotationAmout();
-				break;
-			case ERotationMode::ERM_LookingDirection:
-				RotationAmout();
-				break;
-			case ERotationMode::ERM_Aiming:
+			}
+			else
+			{
 				LimitRotation(-100.f, 100.f, 20.f);
 				RotationAmout();
-				
-				break;
-			default:
-				break;
 			}
-
-			break;
-		case EViewMode::EVM_FirstPerson:
+		}
+		else
+		{
 			LimitRotation(-100.f, 100.f, 20.f);
 			RotationAmout();
-
-			break;
-		default:
-			break;
 		}
-	
-
-
-		//if (RotationMode == ERotationMode::ERM_LookingDirection)
-		//{
-		//	RotationAmout();
-		//}
-		//else if (RotationMode == ERotationMode::ERM_Aiming)
-		//{
-		//	LimitRotation(-100.f, 100.f, 20.f);
-		//	RotationAmout();
-		//}
 	}
 
 }
@@ -1032,7 +996,7 @@ float AProject_ZSCharacter::GetMappedSpeed()
 	{
 		return MappedWalkSpeed;
 	}
-	return 0.0f;
+	//return 0.0f;
 }
 bool AProject_ZSCharacter::CanUpdateMovingRotation()
 {
@@ -1067,14 +1031,13 @@ void AProject_ZSCharacter::LimitRotation(float AnimYawMin, float AnimYawMax, flo
 	{ 
 		FRotator AimRot = FRotator(0.0f);
 		AimRot.Yaw = m_RotationDelta.Yaw > 0.f ? GetControlRotation().Yaw + AnimYawMin : GetControlRotation().Yaw + AnimYawMax;
-		UE_LOG(LogTemp, Warning, TEXT("m_RotationDelta: %f"), m_RotationDelta.Yaw);
 		SmoothChracterRotation(AimRot, 0.f, InterpSpeed);
 	}
 }
 void AProject_ZSCharacter::RotationAmout()
 {
 	float RotationAmount = GetAnimCurveValue("RotationAmount");
-	if (abs(RotationAmount > 0.001f))
+	if (abs(RotationAmount) > 0.001f)
 	{
 		FRotator ActorRotation = FRotator(0.f);
 		ActorRotation.Yaw = RotationAmount * (GetWorld()->GetDeltaSeconds() / (1.f / 30.f));

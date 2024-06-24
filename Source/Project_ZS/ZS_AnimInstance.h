@@ -29,7 +29,7 @@ protected:
 	void UpdateCharacterInfor();
 	void UpdateAimingValues();
 	void UpdateLayerValues();
-
+	void UpdateFootIK();
 
 	void DoWhileMoving();
 	void DoWhileNotMoving();
@@ -77,6 +77,11 @@ protected:
 	void PlayDynamicTransition(float ReTriggerDelay, FDynamicMontageParams_Asset Parameters);
 	void DynamicTranstionCheck();
 	void MakeTheGateOpen();
+
+	void SetFootLocking(FName EnableFootIkCurve, FName FootLockCurve, FName IKFootBone, float& FootLockAlpha,FVector& FootLocation,FRotator& FootLockRotation);
+	void SetFootOffset(FName EnableFootIkCurve, FName IKFootBone, FName RootBone,FVector& CurrentLocationTarget,FVector& CurrentLocationOffset,FRotator& CurrentRotationOffset );
+	void SetPelvisIKOffset(FVector FootOffsetLTarget,FVector FootOffsetRTarget);
+	void ResetIKOffsets();
 
 #pragma endregion
 #pragma endregion
@@ -283,7 +288,6 @@ private:
 
 	FGate Gates;
 #pragma endregion
-#pragma endregion
 #pragma region InAir Variables
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Anim Graph - InAIr", meta = (AllowPrivateAccess = "true"))
 	float LandPrediction;
@@ -296,7 +300,30 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Curve", meta = (AllowPrivateAccess = "true"))
 	UCurveFloat* LeanInAirCurve;
 #pragma endregion
+#pragma region FootIK Varaiables
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	float FootLockLAlpha;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FVector FootLockLLocation;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FRotator FootLockLRotation;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	float FootLockRAlpha;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FVector FootLockRLocation;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FRotator FootLockRRotation;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FVector FootOffsetLLocation;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FRotator FootOffsetLRotation;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FVector FootOffsetRLocation;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FRotator FootOffsetRRotation;
+
+#pragma endregion
 #pragma region Struct Values
 	FDoOnce DoOnce;
 	FDoOnce DoOnce1;
