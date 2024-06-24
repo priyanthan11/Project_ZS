@@ -78,10 +78,11 @@ protected:
 	void DynamicTranstionCheck();
 	void MakeTheGateOpen();
 
-	void SetFootLocking(FName EnableFootIkCurve, FName FootLockCurve, FName IKFootBone, float& FootLockAlpha,FVector& FootLocation,FRotator& FootLockRotation);
+	void SetFootLocking(FName EnableFootIkCurve, FName FootLockCurve, FName IKFootBone, float& FootLockAlpha,FVector& FootLockLocation,FRotator& FootLockRotation);
 	void SetFootOffset(FName EnableFootIkCurve, FName IKFootBone, FName RootBone,FVector& CurrentLocationTarget,FVector& CurrentLocationOffset,FRotator& CurrentRotationOffset );
 	void SetPelvisIKOffset(FVector FootOffsetLTarget,FVector FootOffsetRTarget);
 	void ResetIKOffsets();
+	void SetFootLockOffsets(FVector& LocalLocation, FRotator& LocalRotation);
 
 #pragma endregion
 #pragma endregion
@@ -322,7 +323,16 @@ private:
 	FVector FootOffsetRLocation;
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
 	FRotator FootOffsetRRotation;
-
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	float PelvisAlpha;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FVector PelvisOffset;
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - FookIK", meta = (AllowPrivateAccess = "true"))
+	FVector PelvisTarget;
+#pragma endregion
+#pragma region Config Varaiables
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AnimGraph - Config", meta = (AllowPrivateAccess = "true"))
+	float FootHeight;
 #pragma endregion
 #pragma region Struct Values
 	FDoOnce DoOnce;
