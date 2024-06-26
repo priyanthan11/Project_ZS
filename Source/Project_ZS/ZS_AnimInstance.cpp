@@ -276,8 +276,8 @@ void UZS_AnimInstance::UpdateLayerValues()
 
 void UZS_AnimInstance::UpdateFootIK()
 {
-	SetFootLocking("Enable_FootIK_L", "FootLock_L", "ik_foot_l", FootLockLAlpha, FootLockLLocation, FootOffsetLRotation);
-	SetFootLocking("Enable_FootIK_R", "FootLock_R", "ik_foot_r", FootLockRAlpha, FootLockRLocation, FootOffsetRRotation);
+	SetFootLocking("Enable_FootIK_L", "FootLock_L", "ik_foot_l", FootLockLAlpha, FootLockLLocation, FootLockLRotation);
+	SetFootLocking("Enable_FootIK_R", "FootLock_R", "ik_foot_r", FootLockRAlpha, FootLockRLocation, FootLockRRotation);
 	if (AI_MovementState == EMovementState::EMS_NONE || AI_MovementState == EMovementState::EMS_Grounded || AI_MovementState == EMovementState::EMS_Mantling)
 	{
 		FVector FootOffsetLTarget, FootOffsetRTarget;
@@ -360,7 +360,7 @@ void UZS_AnimInstance::UpdateMovementValues()
 	FLeanAmount tempAmount;
 	tempAmount.LR = RelativeAccelerationAmount.Y;
 	tempAmount.FB = RelativeAccelerationAmount.X;
-
+	
 	LeanAmount = InterpLeanAmount(LeanAmount, tempAmount, 4.f, DeltaX);;
 
 	//Set the Walk Run Blend
@@ -855,8 +855,7 @@ void UZS_AnimInstance::SetFootLocking(FName EnableFootIkCurve, FName FootLockCur
 	{
 		//Step 1: Set Local FootLock Curve value
 		float FootLockCurveValue = GetCurveValue(FootLockCurve);
-		//UE_LOG(LogTemp, Warning, TEXT("FootIK: %f"), FootLockCurveValue);
-
+		
 		/*Step 2: Only update the FootLock Alpha if the new value is less than the current, or it equals 1.
 		This makes it so that the foot can only blend out of the locked position or lock to a new position,
 		and never blend in.*/
@@ -882,18 +881,34 @@ void UZS_AnimInstance::SetFootLocking(FName EnableFootIkCurve, FName FootLockCur
 
 void UZS_AnimInstance::SetFootOffset(FName EnableFootIkCurve, FName IKFootBone, FName RootBone, FVector& CurrentLocationTarget, FVector& CurrentLocationOffset, FRotator& CurrentRotationOffset)
 {
-	//Only update Foot IK offset values if the Foot IK curve has a weight. If it equals 0, clear the offset values.
+	//Only update Foot IK offset values if the Foot IK curve has a weight. 
+	// If it equals 0, clear the offset values.
 	if (GetCurveValue(EnableFootIkCurve) > 0.0f)
 	{
-		//Step 1: Trace downward from the foot location to find the geometry. If the surface is walkable, save the Impact Location and Normal.
-		FVector IKFootFloorLocation = UKismetMathLibrary::MakeVector(GetOwningComponent()->GetSocketLocation(IKFootBone).X, GetOwningComponent()->GetSocketLocation(IKFootBone).Y, GetOwningComponent()->GetSocketLocation(RootBone).Z);
+		//Step 1: Trace downward from the foot location to find the geometry. 
+		// If the surface is walkable, save the Impact Location and Normal.
+
+		FVector IKFootFloorLocation = UKismetMathLibrary::MakeVector(
+			GetOwningComponent()->GetSocketLocation(IKFootBone).X, 
+			GetOwningComponent()->GetSocketLocation(IKFootBone).Y, 
+			GetOwningComponent()->GetSocketLocation(RootBone).Z);
 		FVector Start = IKFootFloorLocation + FVector(0.0f, 0.0f, 50.f);
 		FVector End = IKFootFloorLocation - FVector(0.0f, 0.0f, 45.f);
 		FHitResult HitResult;
 		TArray<AActor*> ActorsToIgnore;
 		ActorsToIgnore.Add(GetOwningActor());
 
-		UKismetSystemLibrary::LineTraceSingle(GetWorld(), Start, End, UEngineTypes::ConvertToTraceType(ECC_Visibility), false, ActorsToIgnore, EDrawDebugTrace::ForOneFrame, HitResult, true, FColor::Red, FColor::Green, 5.0f);
+		UKismetSystemLibrary::LineTraceSingle(GetWorld(), 
+			Start, 
+			End, 
+			UEngineTypes::ConvertToTraceType(ECC_Visibility),
+			false,
+			ActorsToIgnore, 
+			EDrawDebugTrace::ForOneFrame,
+			HitResult, 
+			true, FColor::Red,
+			FColor::Green,
+			5.0f);
 		FRotator TargetRotationOffset;
 
 		if (PlayerCharacter->GetCharacterMovement()->IsWalkable(HitResult))
@@ -901,27 +916,43 @@ void UZS_AnimInstance::SetFootOffset(FName EnableFootIkCurve, FName IKFootBone, 
 			FVector ImpactPoint = HitResult.ImpactPoint;
 			FVector ImpactNormal = HitResult.ImpactNormal;
 
-			/*Step 1.1: Find the difference in location from the Impact point and the expected (flat) floor location.
-			These values are offset by the normally multiplied by the foot height to get better behavior on angled
-			surfaces.*/
+			/*Step 1.1: Find the difference in location from the Impact point and the expected (flat) 
+			floor location.	These values are offset by the normally multiplied by the foot height to 
+			get better behavior on angled surfaces.*/
 			CurrentLocationTarget = (ImpactPoint + (ImpactNormal * FootHeight)) - (IKFootFloorLocation + (FVector(0.0f, 0.0f, 1.0f) * FootHeight));
 
 			/*Step 1.2: Calculate the Rotation offset by getting the Atan2 of the Impact Normal.*/
-			TargetRotationOffset = UKismetMathLibrary::MakeRotator(UKismetMathLibrary::Atan2(ImpactNormal.Y, ImpactNormal.Z), UKismetMathLibrary::Atan2(ImpactNormal.X, ImpactNormal.Z) * -1.0f, 0.0f);
+			TargetRotationOffset = UKismetMathLibrary::MakeRotator(
+				UKismetMathLibrary::Atan2(ImpactNormal.Y, ImpactNormal.Z), 
+				UKismetMathLibrary::Atan2(ImpactNormal.X, ImpactNormal.Z) * -1.0f, 
+				0.0f);
 
 		}
-		/*Step 2: Interp the Current Location Offset to the new target value. Interpolate at different speeds based on
-		whether the new target is above or below the current one.*/
+		/*Step 2: Interp the Current Location Offset to the new target value. 
+		Interpolate at different speeds based on whether the new target is above or 
+		below the current one.*/
 		if (CurrentLocationOffset.Z > CurrentLocationTarget.Z)
 		{
-			CurrentLocationOffset = UKismetMathLibrary::VInterpTo(CurrentLocationOffset, CurrentLocationTarget, DeltaX, 30.f);
+			CurrentLocationOffset = UKismetMathLibrary::VInterpTo(
+				CurrentLocationOffset, 
+				CurrentLocationTarget, 
+				DeltaX, 
+				30.f);
 		}
 		else
 		{
-			CurrentLocationOffset = UKismetMathLibrary::VInterpTo(CurrentLocationOffset, CurrentLocationTarget, DeltaX, 15.f);
+			CurrentLocationOffset = UKismetMathLibrary::VInterpTo(
+				CurrentLocationOffset, 
+				CurrentLocationTarget, 
+				DeltaX, 
+				15.f);
 		}
 		/*Step 3: Interp the Current Rotation Offset to the new target value.*/
-		CurrentRotationOffset = UKismetMathLibrary::RInterpTo(CurrentRotationOffset, TargetRotationOffset, DeltaX, 30.f);
+		CurrentRotationOffset = UKismetMathLibrary::RInterpTo(
+			CurrentRotationOffset, 
+			TargetRotationOffset, 
+			DeltaX, 
+			30.f);
 
 	}
 	else
@@ -934,11 +965,8 @@ void UZS_AnimInstance::SetFootOffset(FName EnableFootIkCurve, FName IKFootBone, 
 void UZS_AnimInstance::SetPelvisIKOffset(FVector FootOffsetLTarget, FVector FootOffsetRTarget)
 {
 	/*Calculate the Pelvis Alpha by finding the average Foot IK weight. If the alpha is 0, clear the offset.*/
-	PelvisAlpha = (GetCurveValue("Enable_FootIK_L") + GetCurveValue("Enable_FootIK_R")) / 2.0f;
-
-	//UE_LOG(LogTemp, Warning, TEXT("SetPelvisIKOffset: EnableFootIK_L: %f"), GetCurveValue("Enable_FootIK_L"));
-	//UE_LOG(LogTemp, Warning, TEXT("SetPelvisIKOffset: EnableFootIK_R: %f"), GetCurveValue("Enable_FootIK_R"));
-	//UE_LOG(LogTemp, Warning, TEXT("SetPelvisIKOffset: PelvisAplha: %f"), PelvisAplha);
+	PelvisAlpha = (GetCurveValue("Enable_FootIK_L") + 
+		GetCurveValue("Enable_FootIK_R")) / 2.0f;
 
 	if (PelvisAlpha > 0.0f)
 	{
@@ -947,23 +975,25 @@ void UZS_AnimInstance::SetPelvisIKOffset(FVector FootOffsetLTarget, FVector Foot
 		if (FootOffsetLTarget.Z < FootOffsetRTarget.Z)
 		{
 			PelvisTarget = FootOffsetLTarget;
-
 		}
 		else
 		{
 			PelvisTarget = FootOffsetRTarget;
 		}
 
-		/*Step 2: Interp the Current Pelvis Offset to the new target value. Interpolate at different speeds based
-		on whether the new target is above or below the current one.*/
+		/*Step 2: Interp the Current Pelvis Offset to the new target value. 
+		Interpolate at different speeds based on whether the new target is above or 
+		below the current one.*/
 
 		if (PelvisTarget.Z > PelvisOffset.Z)
 		{
-			PelvisOffset = UKismetMathLibrary::VInterpTo(PelvisOffset, PelvisTarget, DeltaX, 10.0f);
+			PelvisOffset = UKismetMathLibrary::VInterpTo(
+				PelvisOffset, PelvisTarget, DeltaX, 10.0f);
 		}
 		else
 		{
-			PelvisOffset = UKismetMathLibrary::VInterpTo(PelvisOffset, PelvisTarget, DeltaX, 15.0f);
+			PelvisOffset = UKismetMathLibrary::VInterpTo(
+				PelvisOffset, PelvisTarget, DeltaX, 15.0f);
 		}
 
 	}
@@ -992,19 +1022,20 @@ void UZS_AnimInstance::SetFootLockOffsets(FVector& LocalLocation, FRotator& Loca
 	FRotator RotationDifference;
 	if (PlayerCharacter->GetCharacterMovement()->IsMovingOnGround())
 	{
-		RotationDifference = UKismetMathLibrary::NormalizedDeltaRotator(PlayerCharacter->GetActorRotation(), PlayerCharacter->GetCharacterMovement()->GetLastUpdateRotation());
+		RotationDifference = UKismetMathLibrary::NormalizedDeltaRotator(
+			PlayerCharacter->GetActorRotation(), 
+			PlayerCharacter->GetCharacterMovement()->GetLastUpdateRotation());
 	}
 	/*Get the distance traveled between frames relative to the mesh rotation to find how much the foot should be
 	offset to remain planted on the ground.*/
 
 	//FVector LocationDifference = UKismetMathLibrary::LessLess_VectorRotator(AVelocity * GetWorld()->GetDeltaSeconds(),GetOwningComponent()->GetComponentRotation());
-	FVector LocationDifference = GetOwningComponent()->GetComponentRotation().UnrotateVector(AVelocity * GetWorld()->GetDeltaSeconds());
+	FVector LocationDifference = GetOwningComponent()->GetComponentRotation().UnrotateVector(
+		AVelocity * GetWorld()->GetDeltaSeconds());
 
 	/*Subtract the location difference from the current local location and rotate it by the rotation difference to
 	keep the foot planted in component space.*/
-	LocalLocation = UKismetMathLibrary::RotateAngleAxis((LocalLocation - LocationDifference), RotationDifference.Yaw, FVector(0.0f, 0.0f, -1.0f));
-
-
+	LocalLocation = UKismetMathLibrary::RotateAngleAxis(LocalLocation - LocationDifference, RotationDifference.Yaw, FVector(0.0f, 0.0f, -1.0f));
 
 	/*Subtract the Rotation Difference from the current Local Rotation to get the new local rotation.*/
 	LocalRotation = UKismetMathLibrary::NormalizedDeltaRotator(LocalRotation, RotationDifference);
