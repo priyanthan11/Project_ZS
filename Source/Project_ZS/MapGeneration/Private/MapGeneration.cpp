@@ -15,7 +15,8 @@ AMapGeneration::AMapGeneration():
 	MapHeight(100),
 	Scale(50.f),
 	StructureDensity(0.02f),
-	Seed(0)
+	Seed(0),
+	GOctaves(4)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -53,10 +54,15 @@ void AMapGeneration::GenerteHeightMap(int32 Width, int32 Height, float m_Scale, 
 	{
 		for (int32 y = 0; y < Height; y++)
 		{
-			float NoiseValue = PerlinNoise.Noise((x * 0.0001f) / Scale, (y*0.0001f) / Scale);
 
+			//float NoiseValue = PerlinNoise.Noise(x/Scale , y /Scale);
+			float NoiseValue = PerlinNoise.FractalNoise3D(x / Scale, y / Scale,0.0f, 4, 0.4f,5.5f);
+			// Add sine curve variation
+			float SineValue = /*SineAmplitude*/0.8f * FMath::Sin(/*SineFrequency*/0.05f * x) * FMath::Sin(/*SineFrequency*/0.05f * y);
+			float SineValue2 = /*SineAmplitude*/0.4f * FMath::Sin(/*SineFrequency*/0.03f * x) * FMath::Sin(/*SineFrequency*/0.06f * y);
+			float SineValue3 = /*SineAmplitude*/0.2f * FMath::Sin(/*SineFrequency*/0.09f * x) * FMath::Sin(/*SineFrequency*/0.09f * y);
 
-			OutHeightMap[x][y] = NoiseValue;
+			OutHeightMap[x][y] = NoiseValue + (SineValue+ SineValue2+ SineValue3);
 		}
 	}
 	// Debug log to confirm height map generation
@@ -260,7 +266,7 @@ void AMapGeneration::GenerateProceduralMap(const TArray<TArray<float>>& m_Height
 	{
 		for (int32 x = 0; x < width; x++)
 		{
-			float HeightValue = m_HeightMap[x][y] * 350.f; // Z scale of the map
+			float HeightValue = m_HeightMap[x][y] * 850.f; // Z scale of the map
 			Verticies.Add(FVector(x * m_Scale, y * m_Scale, HeightValue));
 			Normals.Add(FVector(0,0,1)); // Default Normals
 
@@ -281,21 +287,39 @@ void AMapGeneration::GenerateProceduralMap(const TArray<TArray<float>>& m_Height
 		for (int32 x = 0; x < width; x++)
 		{
 
-			int32 BottomLeft = x + y * width;
-			int32 BottemRight = (x + 1) + y * width;
-			int32 TopLeft = x + (y + 1) * width;
-			int32 TopRight = (x + 1) + (y + 1) * width;
+			if (x < width -1 && y < height -1)
+			{
+
+				int32 BottomLeft = x + y * width;
+				int32 BottemRight = (x + 1) + y * width;
+				int32 TopLeft = x + (y + 1) * width;
+				int32 TopRight = (x + 1) + (y + 1) * width;
 
 
-			// First Triangle
-			Triangles.Add(BottomLeft);
-			Triangles.Add(TopLeft);
-			Triangles.Add(TopRight);
+				// First Triangle
+				Triangles.Add(BottomLeft);
+				Triangles.Add(TopLeft);
+				Triangles.Add(TopRight);
 
-			// Second Trinagle
-			Triangles.Add(BottomLeft);
-			Triangles.Add(TopRight);
-			Triangles.Add(BottemRight);
+				// Second Trinagle
+				Triangles.Add(BottomLeft);
+				Triangles.Add(TopRight);
+				Triangles.Add(BottemRight);
+
+				/*int32 Index = x + y * width;
+				Triangles.Add(Index);
+				Triangles.Add(Index + width + 1);
+				Triangles.Add(Index + width);
+
+
+				Triangles.Add(Index + 1);
+				Triangles.Add(Index + 1);
+				Triangles.Add(Index + width + 1);*/
+			}
+
+
+
+			
 		}
 	}
 	// Create the Mesh
@@ -355,6 +379,14 @@ float FPerlinNoise::Lerp(float t, float a, float b) const
 	return a+t*(b-a);
 }
 
+float FPerlinNoise::Grad1D(int32 hash, float x) const
+{
+	int32 H = hash & 15;
+	float Grad = 1 + (H & 7); // Gradient value is one of 1, 2, ..., 8
+	if ((H & 8) != 0) Grad = -Grad; // and a random sign
+	return Grad * x;
+}
+
 float FPerlinNoise::Grad(int32 hash, float x, float y) const
 {
 	int32 h = hash & 15;
@@ -362,6 +394,94 @@ float FPerlinNoise::Grad(int32 hash, float x, float y) const
 	float v = h < 4 ? y : (h == 12 || h == 14 ? x : 0.0f);
 	return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
 
+}
+
+float FPerlinNoise::Grad3D(int32 hash, float x, float y, float z) const
+{
+	int32 H = hash & 15;
+	float U = H < 8 ? x : y;
+	float V = H < 4 ? y : (H == 12 || H == 14 ? x : z);
+	return ((H & 1) == 0 ? U : -U) + ((H & 2) == 0 ? V : -V);
+}
+
+float FPerlinNoise::OctaveNoise(float x, float y, int32 Octaves, float Presistence) const
+{
+	float Total = 0;
+	float Frequency = 1;
+	float Amplitude = 1;
+	float MaxValue = 0;
+
+	for (int32 i = 0; i < Octaves; i++)
+	{
+		Total += Noise(x * Frequency, y * Frequency) * Amplitude;
+		MaxValue += Amplitude;
+
+		Amplitude *= Presistence;
+		Frequency *= 2;
+	}
+
+
+	return Total/MaxValue;
+}
+
+float FPerlinNoise::OctaveNoise3D(float x, float y, float z, int32 Octaves, float Presistence) const
+{
+	float Total = 0;
+	float Frequency = 1;
+	float Amplitude = 1;
+	float MaxValue = 0;
+
+	for (int32 i = 0; i < Octaves; ++i)
+	{
+		Total += Noise3D(x * Frequency, y * Frequency, z * Frequency) * Amplitude;
+
+		MaxValue += Amplitude;
+
+		Amplitude *= Presistence;
+		Frequency *= 2;
+	}
+
+	return Total / MaxValue;
+}
+
+float FPerlinNoise::OctaveNoise1D(float x, int32 Octaves, float Presistence) const
+{
+	float Total = 0;
+	float Frequency = 1;
+	float Amplitude = 1;
+	float MaxValue = 0;
+
+	for (int32 i = 0; i < Octaves; ++i)
+	{
+		Total += Noise1D(x * Frequency) * Amplitude;
+
+		MaxValue += Amplitude;
+
+		Amplitude *= Presistence;
+		Frequency *= 2;
+	}
+
+	return Total / MaxValue;
+}
+
+float FPerlinNoise::FractalNoise3D(float X, float Y, float Z, int32 Octaves, float Persistence, float Lacunarity) const
+{
+	float Total = 0;
+	float Frequency = 1;
+	float Amplitude = 1;
+	float MaxValue = 0;
+
+	for (int32 i = 0; i < Octaves; ++i)
+	{
+		Total += Noise3D(X * Frequency, Y * Frequency, Z * Frequency) * Amplitude;
+
+		MaxValue += Amplitude;
+
+		Amplitude *= Persistence;
+		Frequency *= Lacunarity;
+	}
+
+	return Total / MaxValue;
 }
 
 float FPerlinNoise::Noise(float x, float y) const
@@ -388,14 +508,76 @@ float FPerlinNoise::Noise(float x, float y) const
 
 
 }
+float FPerlinNoise::Noise3D(float x, float y, float z) const
+{
+	int32 X0 = FMath::FloorToInt(x) & 255;
+	int32 Y0 = FMath::FloorToInt(y) & 255;
+	int32 Z0 = FMath::FloorToInt(z) & 255;
+	int32 X1 = (X0 + 1) & 255;
+	int32 Y1 = (Y0 + 1) & 255;
+	int32 Z1 = (Z0 + 1) & 255;
+
+	float Xf = x - FMath::FloorToFloat(x);
+	float Yf = y - FMath::FloorToFloat(y);
+	float Zf = z - FMath::FloorToFloat(z);
+
+	float U = fade(Xf);
+	float V = fade(Yf);
+	float W = fade(Zf);
+
+	int32 AAA = Permutation[Permutation[Permutation[X0] + Y0] + Z0];
+	int32 ABA = Permutation[Permutation[Permutation[X0] + Y1] + Z0];
+	int32 AAB = Permutation[Permutation[Permutation[X0] + Y0] + Z1];
+	int32 ABB = Permutation[Permutation[Permutation[X0] + Y1] + Z1];
+	int32 BAA = Permutation[Permutation[Permutation[X1] + Y0] + Z0];
+	int32 BBA = Permutation[Permutation[Permutation[X1] + Y1] + Z0];
+	int32 BAB = Permutation[Permutation[Permutation[X1] + Y0] + Z1];
+	int32 BBB = Permutation[Permutation[Permutation[X1] + Y1] + Z1];
+
+	float GradAAA = Grad3D(AAA, Xf, Yf, Zf);
+	float GradBAA = Grad3D(BAA, Xf - 1, Yf, Zf);
+	float GradABA = Grad3D(ABA, Xf, Yf - 1, Zf);
+	float GradBBA = Grad3D(BBA, Xf - 1, Yf - 1, Zf);
+	float GradAAB = Grad3D(AAB, Xf, Yf, Zf - 1);
+	float GradBAB = Grad3D(BAB, Xf - 1, Yf, Zf - 1);
+	float GradABB = Grad3D(ABB, Xf, Yf - 1, Zf - 1);
+	float GradBBB = Grad3D(BBB, Xf - 1, Yf - 1, Zf - 1);
+
+	float LerpX1 = Lerp(U, GradAAA, GradBAA);
+	float LerpX2 = Lerp(U, GradABA, GradBBA);
+	float LerpY1 = Lerp(V, LerpX1, LerpX2);
+
+	float LerpX3 = Lerp(U, GradAAB, GradBAB);
+	float LerpX4 = Lerp(U, GradABB, GradBBB);
+	float LerpY2 = Lerp(V, LerpX3, LerpX4);
+
+	return Lerp(W, LerpY1, LerpY2);
+}
+float FPerlinNoise::Noise1D(float x) const
+{
+	int32 x0 = FMath::FloorToInt(x) & 255;
+	int32 x1 = (x0 + 1) & 255;
+
+	float xf = x - FMath::FloorToInt(x);
+	float u = fade(xf);
+
+	int32 a = Permutation[x0];
+	int32 b = Permutation[x1];
+
+	float GradA = Grad1D(a, xf);
+	float GradB = Grad1D(b, x1);
+
+	return Lerp(u, GradA, GradB);
+}
 float FPerlinNoise::NoiseAdvanced(float x, float y, float inScale, float amplitute) const
 {
 
 	float px = (x * inScale) + 0.1f;
 	float py = (y * inScale) + 0.1f;
 
-	float adNoise = Noise(px, py);
+	float adNoisex = Noise1D(px);
+	float adNoisey = Noise1D(py);
 
-	return adNoise * amplitute;
+	return (adNoisex*adNoisey)*amplitute;
 }
 #pragma endregion

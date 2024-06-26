@@ -37,7 +37,8 @@ public:
 	float StructureDensity;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Generation")
 	int32 Seed;
-
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Generation")
+	int32 GOctaves;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map", meta = (AllowPrivateAcces = "true"))
 	FRandomStream RandomStream;
@@ -78,12 +79,33 @@ class PROJECT_ZS_API FPerlinNoise
 public:
 	FPerlinNoise(int32 Seed);
 	float Noise(float x, float y) const;
+	float Noise3D(float x, float y,float z) const;
+	float Noise1D(float x) const;
 	float NoiseAdvanced(float x, float y,float inScale, float amplitute) const;
+
+
+	/*
+	Octave Noise Function: This function generates noise using multiple octaves.
+		OctaveNoise for 2D noise.
+		OctaveNoise1D for 1D noise.
+	Frequency and Amplitude: Increase the frequency and decrease the amplitude for each successive octave.
+	Persistence: Determines how quickly the amplitude decreases for each octave. A typical value is between 0.4 and 0.6.
+	Summing Values: Sum the noise values from each octave and normalize by dividing by the maximum possible value.
+	
+	*/
+	float OctaveNoise(float x, float y, int32 Octaves, float Presistence) const;
+	float OctaveNoise3D(float x, float y, float z, int32 Octaves, float Presistence) const;
+	float OctaveNoise1D(float x, int32 Octaves, float Presistence) const;
+	float FractalNoise3D(float X, float Y, float Z, int32 Octaves, float Persistence, float Lacunarity) const;
 private:
 	TArray<int32>Permutation;
 
 	float fade(float t) const;
 	float Lerp(float t, float a, float b) const;
+	float Grad1D(int32 hash, float x) const;
 	float Grad(int32 hash, float x, float y) const;
+	float Grad3D(int32 hash, float x, float y,float z) const;
+
+	
 
 };
